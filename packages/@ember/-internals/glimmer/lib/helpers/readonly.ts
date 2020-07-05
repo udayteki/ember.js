@@ -2,8 +2,7 @@
 @module ember
 */
 import { Environment, VM, VMArguments } from '@glimmer/interfaces';
-import { RootReference, VersionedPathReference } from '@glimmer/reference';
-import { Tag } from '@glimmer/validator';
+import { PathReference, RootReference } from '@glimmer/reference';
 import { INVOKE, unMut } from './mut';
 
 /**
@@ -122,11 +121,8 @@ import { INVOKE, unMut } from './mut';
   @private
 */
 class ReadonlyReference extends RootReference {
-  public tag: Tag;
-
-  constructor(protected inner: VersionedPathReference, env: Environment) {
+  constructor(protected inner: PathReference, env: Environment) {
     super(env);
-    this.tag = inner.tag;
   }
 
   get [INVOKE](): Function | undefined {
@@ -137,7 +133,7 @@ class ReadonlyReference extends RootReference {
     return this.inner.value();
   }
 
-  get(key: string): VersionedPathReference {
+  get(key: string): PathReference {
     return this.inner.get(key);
   }
 }

@@ -11,7 +11,7 @@ import {
   VMArguments,
 } from '@glimmer/interfaces';
 import { registerDestructor } from '@glimmer/runtime';
-import { Tag } from '@glimmer/validator';
+import { createUpdatableTag } from '@glimmer/validator';
 import { SimpleElement } from '@simple-dom/interface';
 import { INVOKE } from '../helpers/mut';
 
@@ -70,7 +70,7 @@ export class ActionState {
   public implicitTarget: any;
   public dom: any;
   public eventName: any;
-  public tag: Tag;
+  public tag = createUpdatableTag();
 
   constructor(
     element: SimpleElement,
@@ -80,8 +80,7 @@ export class ActionState {
     namedArgs: CapturedNamedArguments,
     positionalArgs: CapturedPositionalArguments,
     implicitTarget: any,
-    dom: any,
-    tag: Tag
+    dom: any
   ) {
     this.element = element;
     this.actionId = actionId;
@@ -92,7 +91,6 @@ export class ActionState {
     this.implicitTarget = implicitTarget;
     this.dom = dom;
     this.eventName = this.getEventName();
-    this.tag = tag;
 
     registerDestructor(this, () => ActionHelper.unregisterAction(this));
   }
@@ -192,7 +190,7 @@ export default class ActionModifierManager implements ModifierManager<ActionStat
     _dynamicScope: DynamicScope,
     dom: any
   ) {
-    let { named, positional, tag } = args.capture();
+    let { named, positional } = args.capture();
     let implicitTarget;
     let actionName;
     let actionNameRef: any;
@@ -236,8 +234,7 @@ export default class ActionModifierManager implements ModifierManager<ActionStat
       named,
       positional,
       implicitTarget,
-      dom,
-      tag
+      dom
     );
 
     deprecate(

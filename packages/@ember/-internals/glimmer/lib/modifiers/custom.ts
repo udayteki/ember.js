@@ -1,20 +1,9 @@
 import { Factory } from '@ember/-internals/owner';
-import { getDebugName } from '@ember/-internals/utils';
 import { assert } from '@ember/debug';
-import { DEBUG } from '@glimmer/env';
 import { CapturedArguments, Dict, ModifierManager, VMArguments } from '@glimmer/interfaces';
 import { registerDestructor } from '@glimmer/runtime';
-import {
-  combine,
-  CONSTANT_TAG,
-  createUpdatableTag,
-  Tag,
-  track,
-  untrack,
-  updateTag,
-} from '@glimmer/validator';
+import { createUpdatableTag, untrack } from '@glimmer/validator';
 import { SimpleElement } from '@simple-dom/interface';
-import debugRenderMessage from '../utils/debug-render-message';
 
 export interface CustomModifierDefinitionState<ModifierInstance> {
   ModifierClass: Factory<ModifierInstance>;
@@ -90,6 +79,11 @@ export interface ModifierManagerDelegate<ModifierInstance> {
   destroyModifier(instance: ModifierInstance, args: Args): void;
 }
 
+function trackArgs(args: CapturedArguments) {
+  args.named.references.forEach(n => n.value());
+  args.positional.references.forEach(n => n.value());
+}
+
 /**
   The CustomModifierManager allows addons to provide custom modifier
   implementations that integrate seamlessly into Ember. This is accomplished
@@ -129,16 +123,15 @@ class InteractiveCustomModifierManager<ModifierInstance>
     const capturedArgs = args.capture();
 
     let instance = definition.delegate.createModifier(ModifierClass, capturedArgs.value());
-
     return new CustomModifierState(element, delegate, instance, capturedArgs);
   }
 
-  getTag({ args, tag }: CustomModifierState<ModifierInstance>): Tag {
-    return combine([tag, args.tag]);
+  getTag({ tag }: CustomModifierState<ModifierInstance>) {
+    return tag;
   }
 
   install(state: CustomModifierState<ModifierInstance>) {
-    let { element, args, delegate, modifier, tag } = state;
+    let { element, args, delegate, modifier } = state;
 
     assert(
       'Custom modifier managers must define their capabilities using the capabilities() helper function',
@@ -147,30 +140,25 @@ class InteractiveCustomModifierManager<ModifierInstance>
 
     let { capabilities } = delegate;
 
+    trackArgs(args);
+
     if (capabilities.disableAutoTracking === true) {
       untrack(() => delegate.installModifier(modifier, element, args.value()));
     } else {
-      let combinedTrackingTag = track(
-        () => delegate.installModifier(modifier, element, args.value()),
-        DEBUG && debugRenderMessage!(`(instance of a \`${getDebugName!(modifier)}\` modifier)`)
-      );
-
-      updateTag(tag, combinedTrackingTag);
+      delegate.installModifier(modifier, element, args.value());
     }
   }
 
   update(state: CustomModifierState<ModifierInstance>) {
-    let { args, delegate, modifier, tag } = state;
+    let { args, delegate, modifier } = state;
     let { capabilities } = delegate;
+
+    trackArgs(args);
 
     if (capabilities.disableAutoTracking === true) {
       untrack(() => delegate.updateModifier(modifier, args.value()));
     } else {
-      let combinedTrackingTag = track(
-        () => delegate.updateModifier(modifier, args.value()),
-        DEBUG && debugRenderMessage!(`(instance of a \`${getDebugName!(modifier)}\` modifier)`)
-      );
-      updateTag(tag, combinedTrackingTag);
+      delegate.updateModifier(modifier, args.value());
     }
   }
 
@@ -185,8 +173,8 @@ class NonInteractiveCustomModifierManager<ModifierInstance>
     return null;
   }
 
-  getTag(): Tag {
-    return CONSTANT_TAG;
+  getTag() {
+    return null;
   }
 
   install() {}

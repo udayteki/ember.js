@@ -16,7 +16,7 @@ import {
   SyntaxCompilationContext,
 } from '@glimmer/interfaces';
 import { JitContext } from '@glimmer/opcode-compiler';
-import { VersionedPathReference } from '@glimmer/reference';
+import { PathReference } from '@glimmer/reference';
 import {
   clientBuilder,
   CurriedComponentDefinition,
@@ -59,14 +59,14 @@ export type IBuilder = (env: Environment, cursor: Cursor) => ElementBuilder;
 export class DynamicScope implements GlimmerDynamicScope {
   constructor(
     public view: Component | {} | null,
-    public outletState: VersionedPathReference<OutletState | undefined>
+    public outletState: PathReference<OutletState | undefined>
   ) {}
 
   child() {
     return new DynamicScope(this.view, this.outletState);
   }
 
-  get(key: 'outletState'): VersionedPathReference<OutletState | undefined> {
+  get(key: 'outletState'): PathReference<OutletState | undefined> {
     // tslint:disable-next-line:max-line-length
     assert(
       `Using \`-get-dynamic-scope\` is only supported for \`outletState\` (you used \`${key}\`).`,
@@ -75,7 +75,7 @@ export class DynamicScope implements GlimmerDynamicScope {
     return this.outletState;
   }
 
-  set(key: 'outletState', value: VersionedPathReference<OutletState | undefined>) {
+  set(key: 'outletState', value: PathReference<OutletState | undefined>) {
     // tslint:disable-next-line:max-line-length
     assert(
       `Using \`-with-dynamic-scope\` is only supported for \`outletState\` (you used \`${key}\`).`,
@@ -97,7 +97,7 @@ class RootState {
     public runtime: JitRuntimeContext<OwnedTemplateMeta, EmberEnvironmentExtra>,
     context: SyntaxCompilationContext,
     template: OwnedTemplate,
-    self: VersionedPathReference<unknown>,
+    self: PathReference<unknown>,
     parentElement: SimpleElement,
     dynamicScope: DynamicScope,
     builder: IBuilder

@@ -11,6 +11,7 @@ import {
 } from '@glimmer/interfaces';
 import { EMPTY_ARGS } from '@glimmer/runtime';
 import { unwrapTemplate } from '@glimmer/util';
+import { CONSTANT_TAG } from '@glimmer/validator';
 import { DIRTY_TAG } from '../component';
 import { EmberVMEnvironment } from '../environment';
 import { DynamicScope } from '../renderer';
@@ -69,6 +70,7 @@ class RootComponentManager extends CurlyComponentManager {
       environment,
       component,
       null,
+      CONSTANT_TAG,
       finalizer,
       hasWrappedElement
     );

@@ -4,8 +4,7 @@
 import { symbol } from '@ember/-internals/utils';
 import { assert } from '@ember/debug';
 import { Environment, VM, VMArguments } from '@glimmer/interfaces';
-import { RootReference, UPDATE_REFERENCED_VALUE, VersionedPathReference } from '@glimmer/reference';
-import { Tag } from '@glimmer/validator';
+import { PathReference, RootReference, UPDATE_REFERENCED_VALUE } from '@glimmer/reference';
 
 /**
   The `mut` helper lets you __clearly specify__ that a child `Component` can update the
@@ -84,12 +83,10 @@ export const INVOKE: unique symbol = symbol('INVOKE') as any;
 const SOURCE: unique symbol = symbol('SOURCE') as any;
 
 class MutReference extends RootReference {
-  public tag: Tag;
-  public [SOURCE]: VersionedPathReference;
+  public [SOURCE]: PathReference;
 
-  constructor(protected inner: VersionedPathReference, env: Environment) {
+  constructor(protected inner: PathReference, env: Environment) {
     super(env);
-    this.tag = inner.tag;
     this[SOURCE] = inner;
   }
 
@@ -97,7 +94,7 @@ class MutReference extends RootReference {
     return this.inner.value();
   }
 
-  get(key: string): VersionedPathReference {
+  get(key: string): PathReference {
     return this.inner.get(key);
   }
 
@@ -110,7 +107,7 @@ class MutReference extends RootReference {
   }
 }
 
-export function unMut(ref: VersionedPathReference) {
+export function unMut(ref: PathReference) {
   return ref[SOURCE] || ref;
 }
 

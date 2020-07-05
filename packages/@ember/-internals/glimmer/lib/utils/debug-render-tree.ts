@@ -1,6 +1,6 @@
 import { assert } from '@ember/debug';
 import { Bounds, CapturedArguments, Option } from '@glimmer/interfaces';
-import { VersionedPathReference } from '@glimmer/reference';
+import { PathReference } from '@glimmer/reference';
 import { expect, Stack, unwrapTemplate } from '@glimmer/util';
 import { SimpleElement, SimpleNode } from '@simple-dom/interface';
 import { OwnedTemplate } from '../template';
@@ -107,7 +107,7 @@ export default class DebugRenderTree<Bucket extends object = object> {
   private refs = new WeakMap<Bucket, Ref<Bucket>>();
   private roots = new Set<Ref<Bucket>>();
   private nodes = new WeakMap<Bucket, InternalRenderNode<Bucket>>();
-  private pathNodes = new WeakMap<VersionedPathReference, InternalPathNode<Bucket>>();
+  private pathNodes = new WeakMap<PathReference, InternalPathNode<Bucket>>();
 
   begin(): void {
     this.reset();
@@ -153,10 +153,10 @@ export default class DebugRenderTree<Bucket extends object = object> {
   }
 
   createPath(
-    pathRef: VersionedPathReference,
+    pathRef: PathReference,
     name: string,
     type: PathNodeType,
-    parentRef: Option<VersionedPathReference>
+    parentRef: Option<PathReference>
   ) {
     assert(
       'BUG: Attempted to register a path that had already been registered',
@@ -217,7 +217,7 @@ export default class DebugRenderTree<Bucket extends object = object> {
     this.pathNodes.set(pathRef, pathNode);
   }
 
-  logRenderStackForPath(pathRef: VersionedPathReference): string {
+  logRenderStackForPath(pathRef: PathReference): string {
     let node: InternalRenderNode<Bucket> | InternalPathNode<Bucket> | undefined = expect(
       this.pathNodes.get(pathRef),
       'BUG: Attempted to create a log for a path reference, but no node exist for that reference'

@@ -12,9 +12,8 @@ import {
   VMArguments,
   WithJitDynamicLayout,
 } from '@glimmer/interfaces';
-import { ComponentRootReference, VersionedPathReference } from '@glimmer/reference';
+import { ComponentRootReference, PathReference } from '@glimmer/reference';
 import { registerDestructor } from '@glimmer/runtime';
-import { CONSTANT_TAG, createTag, isConstTag, Tag } from '@glimmer/validator';
 import { TemplateFactory } from '../..';
 import { EmberVMEnvironment } from '../environment';
 import RuntimeResolver from '../resolver';
@@ -25,7 +24,7 @@ interface EngineState {
   controller: any;
   self: ComponentRootReference<any>;
   environment: EmberVMEnvironment;
-  modelRef?: VersionedPathReference<unknown>;
+  modelRef?: PathReference<unknown>;
 }
 
 interface EngineDefinitionState {
@@ -128,23 +127,23 @@ class MountManager extends AbstractManager<EngineState, EngineDefinitionState>
     return bucket;
   }
 
-  getSelf({ self }: EngineState): VersionedPathReference<unknown> {
+  getSelf({ self }: EngineState): PathReference<unknown> {
     return self;
   }
 
-  getTag(state: EngineState): Tag {
-    let tag: Tag = CONSTANT_TAG;
+  // getTag(state: EngineState): Tag {
+  //   let tag: Tag = CONSTANT_TAG;
 
-    if (state.modelRef) {
-      tag = state.modelRef.tag;
-    }
+  //   if (state.modelRef) {
+  //     tag = state.modelRef.tag;
+  //   }
 
-    if (ENV._DEBUG_RENDER_TREE && isConstTag(tag)) {
-      tag = createTag();
-    }
+  //   if (ENV._DEBUG_RENDER_TREE && isConstTag(tag)) {
+  //     tag = createTag();
+  //   }
 
-    return tag;
-  }
+  //   return tag;
+  // }
 
   getDestroyable(bucket: EngineState): Option<Destroyable> {
     return bucket.engine;

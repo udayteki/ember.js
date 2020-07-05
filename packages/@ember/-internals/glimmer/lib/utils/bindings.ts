@@ -4,14 +4,8 @@ import { EMBER_COMPONENT_IS_VISIBLE } from '@ember/deprecated-features';
 import { dasherize } from '@ember/string';
 import { DEBUG } from '@glimmer/env';
 import { ElementOperations, Option } from '@glimmer/interfaces';
-import {
-  Reference,
-  RootReference,
-  VersionedPathReference,
-  VersionedReference,
-} from '@glimmer/reference';
+import { PathReference, Reference, RootReference } from '@glimmer/reference';
 import { PrimitiveReference, UNDEFINED_REFERENCE } from '@glimmer/runtime';
-import { combine, Tag } from '@glimmer/validator';
 import { SimpleElement } from '@simple-dom/interface';
 import { EmberVMEnvironment } from '../environment';
 import { Component } from './curly-component-state-bucket';
@@ -115,11 +109,11 @@ let StyleBindingReference:
   | undefined
   | {
       new (
-        parent: VersionedPathReference<Component>,
+        parent: PathReference<Component>,
         inner: Reference<unknown>,
         isVisible: Reference<unknown>,
         env: EmberVMEnvironment
-      ): VersionedReference<string | SafeString>;
+      ): Reference<string | SafeString>;
     };
 
 export let installIsVisibleBinding:
@@ -131,16 +125,13 @@ export let installIsVisibleBinding:
     ) => void);
 
 if (EMBER_COMPONENT_IS_VISIBLE) {
-  StyleBindingReference = class implements VersionedPathReference<string | SafeString> {
-    public tag: Tag;
+  StyleBindingReference = class implements PathReference<string | SafeString> {
     constructor(
-      parent: VersionedPathReference<Component>,
+      parent: PathReference<Component>,
       private inner: Reference<unknown>,
       private isVisible: Reference<unknown>,
       private env: EmberVMEnvironment
     ) {
-      this.tag = combine([inner.tag, isVisible.tag]);
-
       if (DEBUG) {
         env.setTemplatePathDebugContext(this, 'style', parent);
       }
@@ -227,14 +218,10 @@ export const ClassNameBinding = {
   },
 };
 
-export class SimpleClassNameBindingReference implements VersionedReference<Option<string>> {
-  public tag: Tag;
-  private dasherizedPath: Option<string>;
+export class SimpleClassNameBindingReference implements Reference<Option<string>> {
+  private dasherizedPath: Option<string> = null;
 
-  constructor(private inner: Reference<unknown | number>, private path: string) {
-    this.tag = inner.tag;
-    this.dasherizedPath = null;
-  }
+  constructor(private inner: Reference<unknown | number>, private path: string) {}
 
   value(): Option<string> {
     let value = this.inner.value();
@@ -250,16 +237,12 @@ export class SimpleClassNameBindingReference implements VersionedReference<Optio
   }
 }
 
-class ColonClassNameBindingReference implements VersionedReference<Option<string>> {
-  public tag: Tag;
-
+class ColonClassNameBindingReference implements Reference<Option<string>> {
   constructor(
     private inner: Reference<unknown>,
     private truthy: Option<string> = null,
     private falsy: Option<string> = null
-  ) {
-    this.tag = inner.tag;
-  }
+  ) {}
 
   value(): Option<string> {
     let { inner, truthy, falsy } = this;

@@ -1,18 +1,13 @@
 import { assert } from '@ember/debug';
 import { DEBUG } from '@glimmer/env';
 import { Helper, VMArguments } from '@glimmer/interfaces';
-import { VersionedPathReference } from '@glimmer/reference';
-import { Tag } from '@glimmer/validator';
+import { PathReference } from '@glimmer/reference';
 
 let helper: Helper;
 
 if (DEBUG) {
-  class InElementNullCheckReference implements VersionedPathReference {
-    public tag: Tag;
-
-    constructor(private inner: VersionedPathReference) {
-      this.tag = inner.tag;
-    }
+  class InElementNullCheckReference implements PathReference {
+    constructor(private inner: PathReference) {}
 
     value(): unknown {
       let value = this.inner.value();
@@ -25,7 +20,7 @@ if (DEBUG) {
       return value;
     }
 
-    get(key: string): VersionedPathReference {
+    get(key: string): PathReference {
       return this.inner.get(key);
     }
   }

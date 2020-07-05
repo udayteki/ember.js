@@ -4,7 +4,7 @@ import { DEBUG } from '@glimmer/env';
 import { CapturedArguments, ModifierManager, VMArguments } from '@glimmer/interfaces';
 import { registerDestructor } from '@glimmer/runtime';
 import { expect } from '@glimmer/util';
-import { CONSTANT_TAG, Tag } from '@glimmer/validator';
+import { createUpdatableTag, UpdatableTag } from '@glimmer/validator';
 import { SimpleElement } from '@simple-dom/interface';
 import { Renderer } from '../renderer';
 import buildUntouchableThis from '../utils/untouchable-this';
@@ -51,7 +51,7 @@ const SUPPORTS_EVENT_OPTIONS = (() => {
 })();
 
 export class OnModifierState {
-  public tag: Tag;
+  public tag = createUpdatableTag();
   public owner: Owner;
   public element: Element;
   public args: CapturedArguments;
@@ -68,7 +68,6 @@ export class OnModifierState {
     this.owner = owner;
     this.element = element;
     this.args = args;
-    this.tag = args.tag;
   }
 
   updateFromArgs() {
@@ -344,9 +343,9 @@ export default class OnModifierManager implements ModifierManager<OnModifierStat
     return new OnModifierState(this.owner, <Element>element, capturedArgs);
   }
 
-  getTag(state: OnModifierState | null): Tag {
+  getTag(state: OnModifierState | null): UpdatableTag | null {
     if (state === null) {
-      return CONSTANT_TAG;
+      return null;
     }
 
     return state.tag;

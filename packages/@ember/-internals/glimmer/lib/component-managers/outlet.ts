@@ -15,7 +15,7 @@ import {
   WithDynamicTagName,
   WithJitStaticLayout,
 } from '@glimmer/interfaces';
-import { ComponentRootReference, VersionedPathReference } from '@glimmer/reference';
+import { ComponentRootReference, PathReference } from '@glimmer/reference';
 import { EMPTY_ARGS, registerDestructor } from '@glimmer/runtime';
 import { unwrapTemplate } from '@glimmer/util';
 import { CONSTANT_TAG, createTag, Tag } from '@glimmer/validator';
@@ -34,7 +34,7 @@ function instrumentationPayload(def: OutletDefinitionState) {
 }
 
 interface OutletInstanceState {
-  self: VersionedPathReference<any | undefined>;
+  self: PathReference<any | undefined>;
   environment: EmberVMEnvironment;
   outlet?: { name: string };
   engine?: { mountPoint: string };
@@ -42,7 +42,7 @@ interface OutletInstanceState {
 }
 
 export interface OutletDefinitionState {
-  ref: VersionedPathReference<OutletState | undefined>;
+  ref: PathReference<OutletState | undefined>;
   name: string;
   outlet: string;
   template: OwnedTemplate;

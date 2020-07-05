@@ -3,33 +3,26 @@
 */
 import { tagForProperty } from '@ember/-internals/metal';
 import { VMArguments } from '@glimmer/interfaces';
-import { VersionedPathReference } from '@glimmer/reference';
-import { combine, createUpdatableTag, Tag, updateTag } from '@glimmer/validator';
+import { PathReference } from '@glimmer/reference';
+import { consumeTag } from '@glimmer/validator';
 
 /**
   This reference is used to get the `[]` tag of iterables, so we can trigger
   updates to `{{each}}` when it changes. It is put into place by a template
   transform at build time, similar to the (-each-in) helper
 */
-class TrackArrayReference implements VersionedPathReference {
-  public tag: Tag;
-  private valueTag = createUpdatableTag();
-
-  constructor(private inner: VersionedPathReference) {
-    this.tag = combine([inner.tag, this.valueTag]);
-  }
+class TrackArrayReference implements PathReference {
+  constructor(private inner: PathReference) {}
 
   value(): unknown {
     let iterable = this.inner.value();
 
-    let tag = tagForProperty(iterable, '[]');
-
-    updateTag(this.valueTag, tag);
+    consumeTag(tagForProperty(iterable, '[]'));
 
     return iterable;
   }
 
-  get(key: string): VersionedPathReference {
+  get(key: string): PathReference {
     return this.inner.get(key);
   }
 }

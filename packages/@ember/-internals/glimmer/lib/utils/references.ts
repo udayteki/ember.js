@@ -2,7 +2,7 @@ import { getDebugName, isObject } from '@ember/-internals/utils';
 import { debugFreeze } from '@ember/debug';
 import { DEBUG } from '@glimmer/env';
 import { CapturedArguments, Environment } from '@glimmer/interfaces';
-import { HelperRootReference, RootReference, VersionedPathReference } from '@glimmer/reference';
+import { HelperRootReference, PathReference, RootReference } from '@glimmer/reference';
 import { PrimitiveReference } from '@glimmer/runtime';
 import { consumeTag, deprecateMutationsInAutotrackingTransaction } from '@glimmer/validator';
 import { HelperInstance, isClassHelper, RECOMPUTE_TAG, SimpleHelper } from '../helper';
@@ -50,12 +50,7 @@ export class EmberHelperRootReference<T = unknown> extends HelperRootReference<T
 }
 
 export class UnboundRootReference<T = unknown> extends RootReference<T> {
-  constructor(
-    private inner: T,
-    protected env: Environment,
-    parent?: VersionedPathReference,
-    key?: string
-  ) {
+  constructor(private inner: T, protected env: Environment, parent?: PathReference, key?: string) {
     super(env);
 
     if (DEBUG) {
@@ -67,7 +62,7 @@ export class UnboundRootReference<T = unknown> extends RootReference<T> {
     return this.inner;
   }
 
-  get(key: string): VersionedPathReference<unknown> {
+  get(key: string): PathReference<unknown> {
     let value = this.value();
 
     if (isObject(value)) {
@@ -82,9 +77,9 @@ export class UnboundRootReference<T = unknown> extends RootReference<T> {
 export class UnboundPropertyReference extends UnboundRootReference {}
 
 export function referenceFromParts(
-  root: VersionedPathReference<unknown>,
+  root: PathReference<unknown>,
   parts: string[]
-): VersionedPathReference<unknown> {
+): PathReference<unknown> {
   let reference = root;
 
   for (let i = 0; i < parts.length; i++) {

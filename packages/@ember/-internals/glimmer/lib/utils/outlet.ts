@@ -1,6 +1,6 @@
 import { Owner } from '@ember/-internals/owner';
-import { Reference, VersionedPathReference } from '@glimmer/reference';
-import { combine, createTag, dirtyTag, Tag } from '@glimmer/validator';
+import { PathReference, Reference } from '@glimmer/reference';
+import { consumeTag, createTag, dirtyTag } from '@glimmer/validator';
 import { Factory as TemplateFactory, OwnedTemplate } from '../template';
 
 export interface RenderState {
@@ -67,16 +67,17 @@ export interface OutletState {
 /**
  * Represents the root outlet.
  */
-export class RootOutletReference implements VersionedPathReference<OutletState> {
-  tag = createTag();
+export class RootOutletReference implements PathReference<OutletState> {
+  private tag = createTag();
 
   constructor(public outletState: OutletState) {}
 
-  get(key: string): VersionedPathReference<unknown> {
-    return new PathReference(this, key);
+  get(key: string): PathReference {
+    return new OutletPathReference(this, key);
   }
 
   value(): OutletState {
+    consumeTag(this.tag);
     return this.outletState;
   }
 
@@ -89,15 +90,11 @@ export class RootOutletReference implements VersionedPathReference<OutletState> 
 /**
  * Represents the connected outlet.
  */
-export class OutletReference implements VersionedPathReference<OutletState | undefined> {
-  tag: Tag;
-
+export class OutletReference implements PathReference<OutletState | undefined> {
   constructor(
-    public parentStateRef: VersionedPathReference<OutletState | undefined>,
+    public parentStateRef: PathReference<OutletState | undefined>,
     public outletNameRef: Reference<string>
-  ) {
-    this.tag = combine([parentStateRef.tag, outletNameRef.tag]);
-  }
+  ) {}
 
   value(): OutletState | undefined {
     let outletState = this.parentStateRef.value();
@@ -105,8 +102,8 @@ export class OutletReference implements VersionedPathReference<OutletState | und
     return outlets === undefined ? undefined : outlets[this.outletNameRef.value()];
   }
 
-  get(key: string): VersionedPathReference<unknown> {
-    return new PathReference(this, key);
+  get(key: string): PathReference {
+    return new OutletPathReference(this, key);
   }
 }
 
@@ -114,19 +111,17 @@ export class OutletReference implements VersionedPathReference<OutletState | und
  * Outlet state is dirtied from root.
  * This just using the parent tag for dirtiness.
  */
-class PathReference implements VersionedPathReference<unknown> {
-  public parent: VersionedPathReference<unknown>;
+class OutletPathReference implements PathReference<unknown> {
+  public parent: PathReference<unknown>;
   public key: string;
-  public tag: Tag;
 
-  constructor(parent: VersionedPathReference<unknown>, key: string) {
+  constructor(parent: PathReference<unknown>, key: string) {
     this.parent = parent;
     this.key = key;
-    this.tag = parent.tag;
   }
 
-  get(key: string): VersionedPathReference<unknown> {
-    return new PathReference(this, key);
+  get(key: string): PathReference<unknown> {
+    return new OutletPathReference(this, key);
   }
 
   value(): unknown {

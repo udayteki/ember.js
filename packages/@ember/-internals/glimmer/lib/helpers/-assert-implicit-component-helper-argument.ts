@@ -1,18 +1,13 @@
 import { assert } from '@ember/debug';
 import { DEBUG } from '@glimmer/env';
 import { Helper, VMArguments } from '@glimmer/interfaces';
-import { VersionedPathReference } from '@glimmer/reference';
-import { Tag } from '@glimmer/validator';
+import { PathReference } from '@glimmer/reference';
 
 let helper: Helper;
 
 if (DEBUG) {
-  class ComponentAssertionReference implements VersionedPathReference<unknown> {
-    public tag: Tag;
-
-    constructor(private component: VersionedPathReference<unknown>, private message: string) {
-      this.tag = component.tag;
-    }
+  class ComponentAssertionReference implements PathReference<unknown> {
+    constructor(private component: PathReference<unknown>, private message: string) {}
 
     value(): unknown {
       let value = this.component.value();
@@ -22,7 +17,7 @@ if (DEBUG) {
       return value;
     }
 
-    get(property: string): VersionedPathReference<unknown> {
+    get(property: string): PathReference<unknown> {
       return this.component.get(property);
     }
   }
