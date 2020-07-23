@@ -1,33 +1,32 @@
 import { symbol } from '@ember/-internals/utils';
 import { MUTABLE_CELL } from '@ember/-internals/views';
 import { CapturedNamedArguments } from '@glimmer/interfaces';
-import { UPDATE_REFERENCED_VALUE } from '@glimmer/reference';
+import { isUpdatableRef, updateRef, valueForRef } from '@glimmer/reference';
 import { ARGS } from '../component';
-import { ACTION } from '../helpers/action';
+import { ACTIONS } from '../helpers/action';
 
 // ComponentArgs takes EvaluatedNamedArgs and converts them into the
 // inputs needed by CurlyComponents (attrs and props, with mutable
 // cells, etc).
 export function processComponentArgs(namedArgs: CapturedNamedArguments) {
-  let keys = namedArgs.names;
-  let attrs = namedArgs.value();
+  let keys = Object.keys(namedArgs);
   let props = Object.create(null);
-  let args = Object.create(null);
 
-  props[ARGS] = args;
+  let attrs: Record<string, unknown> = {};
+
+  props[ARGS] = namedArgs;
 
   for (let i = 0; i < keys.length; i++) {
     let name = keys[i];
-    let ref = namedArgs.get(name);
-    let value = attrs[name];
+    let ref = namedArgs[name];
+    let value = valueForRef(ref);
 
-    if (typeof value === 'function' && value[ACTION]) {
+    if (typeof value === 'function' && ACTIONS.has(value)) {
       attrs[name] = value;
-    } else if (ref[UPDATE_REFERENCED_VALUE]) {
+    } else if (isUpdatableRef(ref)) {
       attrs[name] = new MutableCell(ref, value);
     }
 
-    args[name] = ref;
     props[name] = value;
   }
 
@@ -47,6 +46,6 @@ class MutableCell {
   }
 
   update(val: any) {
-    this[REF][UPDATE_REFERENCED_VALUE](val);
+    updateRef(this[REF], val);
   }
 }

@@ -7,13 +7,15 @@ import {
   VMArguments,
   WithJitStaticLayout,
 } from '@glimmer/interfaces';
-import { NULL_REFERENCE, registerDestructor } from '@glimmer/runtime';
+import { createPrimitiveRef } from '@glimmer/reference';
+import { registerDestructor } from '@glimmer/runtime';
 import { unwrapTemplate } from '@glimmer/util';
 import { CONSTANT_TAG, createTag } from '@glimmer/validator';
 import { EmberVMEnvironment } from '../environment';
 import RuntimeResolver from '../resolver';
 import { OwnedTemplate } from '../template';
 import AbstractManager from './abstract';
+import { NULL_REFERENCE } from '@glimmer/reference';
 
 const CAPABILITIES: ComponentCapabilities = {
   dynamicLayout: false,

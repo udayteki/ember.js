@@ -1,5 +1,7 @@
-import { CapturedArguments, VM, VMArguments } from '@glimmer/interfaces';
-import { HelperRootReference } from '@glimmer/reference';
+import { VM, VMArguments } from '@glimmer/interfaces';
+import { createComputeRef } from '@glimmer/reference';
+import { reifyPositional } from '@glimmer/runtime';
+
 /**
 @module ember
 */
@@ -17,12 +19,12 @@ import { HelperRootReference } from '@glimmer/reference';
   @param {Array} params
   @public
 */
-function log({ positional }: CapturedArguments) {
-  /* eslint-disable no-console */
-  console.log(...positional.value());
-  /* eslint-enable no-console */
-}
-
 export default function(args: VMArguments, vm: VM) {
-  return new HelperRootReference(log, args.capture(), vm.env);
+  let positional = args.positional.capture();
+
+  return createComputeRef(vm.env, () => {
+    /* eslint-disable no-console */
+    console.log(...reifyPositional(positional));
+    /* eslint-enable no-console */
+  });
 }

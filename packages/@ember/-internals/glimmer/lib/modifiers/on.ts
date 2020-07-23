@@ -2,7 +2,8 @@ import { Owner } from '@ember/-internals/owner';
 import { assert } from '@ember/debug';
 import { DEBUG } from '@glimmer/env';
 import { CapturedArguments, ModifierManager, VMArguments } from '@glimmer/interfaces';
-import { registerDestructor } from '@glimmer/runtime';
+import { valueForRef } from '@glimmer/reference';
+import { registerDestructor, reifyNamed } from '@glimmer/runtime';
 import { expect } from '@glimmer/util';
 import { createUpdatableTag, UpdatableTag } from '@glimmer/validator';
 import { SimpleElement } from '@simple-dom/interface';
@@ -73,7 +74,7 @@ export class OnModifierState {
   updateFromArgs() {
     let { args } = this;
 
-    let { once, passive, capture }: AddEventListenerOptions = args.named.value();
+    let { once, passive, capture }: AddEventListenerOptions = reifyNamed(args.named);
     if (once !== this.once) {
       this.once = once;
       this.shouldUpdate = true;
@@ -98,20 +99,20 @@ export class OnModifierState {
 
     assert(
       'You must pass a valid DOM event name as the first argument to the `on` modifier',
-      args.positional.at(0) !== undefined && typeof args.positional.at(0).value() === 'string'
+      args.positional[0] !== undefined && typeof valueForRef(args.positional[0]) === 'string'
     );
-    let eventName = args.positional.at(0).value() as string;
+    let eventName = valueForRef(args.positional[0]) as string;
     if (eventName !== this.eventName) {
       this.eventName = eventName;
       this.shouldUpdate = true;
     }
 
-    let userProvidedCallbackReference = args.positional.at(1);
+    let userProvidedCallbackReference = args.positional[1];
 
     if (DEBUG) {
       assert(
         `You must pass a function as the second argument to the \`on\` modifier.`,
-        args.positional.at(1) !== undefined
+        args.positional[1] !== undefined
       );
 
       // hardcoding `renderer:-dom` here because we guard for `this.isInteractive` before instantiating OnModifierState, it can never be created when the renderer is `renderer:-inert`
@@ -121,7 +122,7 @@ export class OnModifierState {
       );
       let stack = renderer.debugRenderTree.logRenderStackForPath(userProvidedCallbackReference);
 
-      let value = userProvidedCallbackReference.value();
+      let value = valueForRef(userProvidedCallbackReference);
       assert(
         `You must pass a function as the second argument to the \`on\` modifier, you passed ${
           value === null ? 'null' : typeof value
@@ -130,7 +131,7 @@ export class OnModifierState {
       );
     }
 
-    let userProvidedCallback = userProvidedCallbackReference.value() as EventListener;
+    let userProvidedCallback = valueForRef(userProvidedCallbackReference) as EventListener;
     if (userProvidedCallback !== this.userProvidedCallback) {
       this.userProvidedCallback = userProvidedCallback;
       this.shouldUpdate = true;

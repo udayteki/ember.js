@@ -10,10 +10,10 @@ import {
   ModifierManager,
   VMArguments,
 } from '@glimmer/interfaces';
+import { isInvokableRef, updateRef, valueForRef } from '@glimmer/reference';
 import { registerDestructor } from '@glimmer/runtime';
 import { createUpdatableTag } from '@glimmer/validator';
 import { SimpleElement } from '@simple-dom/interface';
-import { INVOKE } from '../helpers/mut';
 
 const MODIFIERS = ['alt', 'shift', 'meta', 'ctrl'];
 const POINTER_EVENT_TYPE_REGEX = /^click|mouse|touch/;
@@ -96,27 +96,27 @@ export class ActionState {
   }
 
   getEventName() {
-    return this.namedArgs.get('on').value() || 'click';
+    return valueForRef(this.namedArgs.on) || 'click';
   }
 
   getActionArgs() {
     let result = new Array(this.actionArgs.length);
 
     for (let i = 0; i < this.actionArgs.length; i++) {
-      result[i] = this.actionArgs[i].value();
+      result[i] = valueForRef(this.actionArgs[i]);
     }
 
     return result;
   }
 
-  getTarget() {
+  getTarget(): any {
     let { implicitTarget, namedArgs } = this;
-    let target;
+    let target: any = namedArgs.target;
 
-    if (namedArgs.has('target')) {
-      target = namedArgs.get('target').value();
+    if (target !== undefined) {
+      target = valueForRef(target);
     } else {
-      target = implicitTarget.value();
+      target = valueForRef(implicitTarget);
     }
 
     return target;
@@ -124,17 +124,17 @@ export class ActionState {
 
   handler(event: Event): boolean {
     let { actionName, namedArgs } = this;
-    let bubbles = namedArgs.get('bubbles');
-    let preventDefault = namedArgs.get('preventDefault');
-    let allowedKeys = namedArgs.get('allowedKeys');
+    let bubbles = namedArgs.bubbles;
+    let preventDefault = namedArgs.preventDefault;
+    let allowedKeys = namedArgs.allowedKeys;
     let target = this.getTarget();
-    let shouldBubble = bubbles.value() !== false;
+    let shouldBubble = valueForRef(bubbles) !== false;
 
-    if (!isAllowedEvent(event, allowedKeys.value())) {
+    if (!isAllowedEvent(event, valueForRef(allowedKeys))) {
       return true;
     }
 
-    if (preventDefault.value() !== false) {
+    if (valueForRef(preventDefault) !== false) {
       event.preventDefault();
     }
 
@@ -149,9 +149,9 @@ export class ActionState {
         target,
         name: null,
       };
-      if (typeof actionName[INVOKE] === 'function') {
+      if (isInvokableRef(actionName)) {
         flaggedInstrument('interaction.ember-action', payload, () => {
-          actionName[INVOKE].apply(actionName, args);
+          updateRef(actionName, args[0]);
         });
         return;
       }
@@ -195,14 +195,14 @@ export default class ActionModifierManager implements ModifierManager<ActionStat
     let actionName;
     let actionNameRef: any;
     if (positional.length > 1) {
-      implicitTarget = positional.at(0);
-      actionNameRef = positional.at(1);
+      implicitTarget = positional[0];
+      actionNameRef = positional[1];
 
-      if (actionNameRef[INVOKE]) {
+      if (isInvokableRef(actionNameRef)) {
         actionName = actionNameRef;
       } else {
         let actionLabel = actionNameRef.propertyKey;
-        actionName = actionNameRef.value();
+        actionName = valueForRef(actionNameRef);
 
         assert(
           'You specified a quoteless path, `' +
@@ -222,7 +222,7 @@ export default class ActionModifierManager implements ModifierManager<ActionStat
     // The first two arguments are (1) `this` and (2) the action name.
     // Everything else is a param.
     for (let i = 2; i < positional.length; i++) {
-      actionArgs.push(positional.at(i));
+      actionArgs.push(positional[i]);
     }
 
     let actionId = uuid();
@@ -263,10 +263,10 @@ export default class ActionModifierManager implements ModifierManager<ActionStat
 
   update(actionState: ActionState) {
     let { positional } = actionState;
-    let actionNameRef = positional.at(1);
+    let actionNameRef = positional[1];
 
-    if (!actionNameRef[INVOKE]) {
-      actionState.actionName = actionNameRef.value();
+    if (!isInvokableRef(actionNameRef)) {
+      actionState.actionName = valueForRef(actionNameRef);
     }
 
     actionState.eventName = actionState.getEventName();

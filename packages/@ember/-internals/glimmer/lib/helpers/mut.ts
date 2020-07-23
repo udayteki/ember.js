@@ -1,10 +1,8 @@
 /**
 @module ember
 */
-import { symbol } from '@ember/-internals/utils';
-import { assert } from '@ember/debug';
-import { Environment, VM, VMArguments } from '@glimmer/interfaces';
-import { PathReference, RootReference, UPDATE_REFERENCED_VALUE } from '@glimmer/reference';
+import { VMArguments } from '@glimmer/interfaces';
+import { createInvokableRef } from '@glimmer/reference';
 
 /**
   The `mut` helper lets you __clearly specify__ that a child `Component` can update the
@@ -79,58 +77,7 @@ import { PathReference, RootReference, UPDATE_REFERENCED_VALUE } from '@glimmer/
   @for Ember.Templates.helpers
   @public
 */
-export const INVOKE: unique symbol = symbol('INVOKE') as any;
-const SOURCE: unique symbol = symbol('SOURCE') as any;
 
-class MutReference extends RootReference {
-  public [SOURCE]: PathReference;
-
-  constructor(protected inner: PathReference, env: Environment) {
-    super(env);
-    this[SOURCE] = inner;
-  }
-
-  value(): unknown {
-    return this.inner.value();
-  }
-
-  get(key: string): PathReference {
-    return this.inner.get(key);
-  }
-
-  [UPDATE_REFERENCED_VALUE](value: unknown) {
-    return this.inner[UPDATE_REFERENCED_VALUE](value);
-  }
-
-  [INVOKE](value: unknown) {
-    return this.inner[UPDATE_REFERENCED_VALUE](value);
-  }
-}
-
-export function unMut(ref: PathReference) {
-  return ref[SOURCE] || ref;
-}
-
-export default function(args: VMArguments, vm: VM) {
-  let rawRef = args.positional.at(0);
-
-  if (typeof rawRef[INVOKE] === 'function') {
-    return rawRef;
-  }
-
-  // TODO: Improve this error message. This covers at least two distinct
-  // cases:
-  //
-  // 1. (mut "not a path") – passing a literal, result from a helper
-  //    invocation, etc
-  //
-  // 2. (mut receivedValue) – passing a value received from the caller
-  //    that was originally derived from a literal, result from a helper
-  //    invocation, etc
-  //
-  // This message is alright for the first case, but could be quite
-  // confusing for the second case.
-  assert('You can only pass a path to mut', rawRef[UPDATE_REFERENCED_VALUE] !== undefined);
-
-  return new MutReference(rawRef, vm.env);
+export default function(args: VMArguments) {
+  return createInvokableRef(args.positional.at(0));
 }

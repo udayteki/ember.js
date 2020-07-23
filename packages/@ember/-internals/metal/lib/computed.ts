@@ -620,16 +620,16 @@ export class ComputedProperty extends ComputedDescriptor {
 
       let upstreamTag: Tag | undefined = undefined;
 
-      if (this._auto === true) {
-        upstreamTag = track(() => {
-          ret = this._getter!.call(obj, keyName);
-        });
-      } else {
-        // Create a tracker that absorbs any trackable actions inside the CP
-        untrack(() => {
-          ret = this._getter!.call(obj, keyName);
-        });
-      }
+      // if (this._auto === true) {
+      //   upstreamTag = track(() => {
+      //     ret = this._getter!.call(obj, keyName);
+      //   });
+      // } else {
+      // Create a tracker that absorbs any trackable actions inside the CP
+      untrack(() => {
+        ret = this._getter!.call(obj, keyName);
+      });
+      // }
 
       if (this._dependentKeys !== undefined) {
         let tag = combine(getChainTagsForKeys(obj, this._dependentKeys, true));

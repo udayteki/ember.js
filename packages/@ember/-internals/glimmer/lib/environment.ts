@@ -7,7 +7,7 @@ import { assert, deprecate, warn } from '@ember/debug';
 import { backburner, schedule } from '@ember/runloop';
 import { DEBUG } from '@glimmer/env';
 import { ElementBuilder, Environment, Option } from '@glimmer/interfaces';
-import { IterationItemReference, PathReference, PropertyReference } from '@glimmer/reference';
+import { Reference } from '@glimmer/reference';
 import {
   DynamicAttribute,
   dynamicAttribute,
@@ -138,24 +138,20 @@ export class EmberEnvironmentDelegate implements EnvironmentDelegate<EmberEnviro
     return s;
   }
 
-  getTemplatePathDebugContext(pathRef: PathReference) {
+  getTemplatePathDebugContext(pathRef: Reference) {
     let stack = this.extra.debugRenderTree.logRenderStackForPath(pathRef);
 
     return `While rendering:\n\n${stack}`;
   }
 
-  setTemplatePathDebugContext(
-    pathRef: PathReference,
-    desc: string,
-    parentRef: Option<PathReference>
-  ) {
+  setTemplatePathDebugContext(pathRef: Reference, desc: string, parentRef: Option<Reference>) {
     let type: PathNodeType = 'root';
 
-    if (pathRef instanceof IterationItemReference) {
-      type = 'iterator';
-    } else if (pathRef instanceof PropertyReference) {
-      type = 'property';
-    }
+    // if (pathRef instanceof IterationItemReference) {
+    //   type = 'iterator';
+    // } else if (pathRef instanceof PropertyReference) {
+    //   type = 'property';
+    // }
 
     this.extra.debugRenderTree.createPath(pathRef, desc, type, parentRef);
   }

@@ -1,5 +1,6 @@
-import { VMArguments } from '@glimmer/interfaces';
-import { PathReference } from '@glimmer/reference';
+import { VM, VMArguments } from '@glimmer/interfaces';
+import { Reference, createComputeRef } from '@glimmer/reference';
+import { reifyPositional } from '@glimmer/runtime';
 
 /**
 @module ember
@@ -41,6 +42,8 @@ import { PathReference } from '@glimmer/reference';
    @public
  */
 
-export default function(args: VMArguments): PathReference<unknown[]> {
-  return args.positional.capture();
+export default function(args: VMArguments, vm: VM): Reference<unknown[]> {
+  let captured = args.positional.capture();
+
+  return createComputeRef(vm.env, () => reifyPositional(captured));
 }

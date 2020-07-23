@@ -1,19 +1,16 @@
-import { EMBER_ROUTING_MODEL_ARG } from '@ember/canary-features';
-import { DEBUG } from '@glimmer/env';
-import { CapturedArguments, Dict, Option, unsafe, VM, VMArguments } from '@glimmer/interfaces';
-import { ConstReference, PathReference, Reference, RootReference } from '@glimmer/reference';
+import { Option, VM, VMArguments } from '@glimmer/interfaces';
 import {
-  CurriedComponentDefinition,
-  curry,
-  EMPTY_ARGS,
-  UNDEFINED_REFERENCE,
-} from '@glimmer/runtime';
-import { dict } from '@glimmer/util';
+  childRefFromParts,
+  createComputeRef,
+  createRootRef,
+  Reference,
+  valueForRef,
+} from '@glimmer/reference';
+import { CurriedComponentDefinition, curry, EMPTY_POSITIONAL_ARGS } from '@glimmer/runtime';
 import { OutletComponentDefinition, OutletDefinitionState } from '../component-managers/outlet';
-import { EmberVMEnvironment } from '../environment';
 import { DynamicScope } from '../renderer';
 import { isTemplateFactory } from '../template';
-import { OutletReference, OutletState } from '../utils/outlet';
+import { OutletState } from '../utils/outlet';
 
 /**
   The `{{outlet}}` helper lets you specify where a child route will render in
@@ -62,121 +59,70 @@ import { OutletReference, OutletState } from '../utils/outlet';
   @for Ember.Templates.helpers
   @public
 */
+function _outlet([outletRef, outletState]: [Reference, any]) {
+  let state = stateFor(outletRef);
+
+  if (!validate(state, outletState.lastState)) {
+    outletState.lastState = state;
+
+    if (state !== null) {
+      outletState.definition = curry(new OutletComponentDefinition(state), {
+        named: {
+          model: childRefFromParts(outletRef, ['render', 'model']),
+        },
+        positional: EMPTY_POSITIONAL_ARGS,
+      });
+    } else {
+      outletState.definition = null;
+    }
+  }
+
+  return outletState.definition;
+}
+
 export function outletHelper(args: VMArguments, vm: VM) {
   let scope = vm.dynamicScope() as DynamicScope;
   let nameRef: Reference<string>;
 
   if (args.positional.length === 0) {
-    nameRef = new ConstReference('main');
+    nameRef = createRootRef(vm.env, 'main');
   } else {
-    nameRef = args.positional.at<PathReference<string>>(0);
+    nameRef = args.positional.at(0);
   }
 
-  return new OutletComponentReference(
-    new OutletReference(scope.outletState, nameRef),
-    vm.env as EmberVMEnvironment
-  );
-}
+  let outletRef = childRefFromParts(scope.outletState, ['outlets', nameRef]);
 
-class OutletModelReference extends RootReference {
-  constructor(private parent: PathReference<OutletState | undefined>, env: EmberVMEnvironment) {
-    super(env);
-  }
+  let lastState: Option<OutletDefinitionState> = null;
+  let definition: Option<CurriedComponentDefinition> = null;
 
-  value(): unknown {
-    let state = this.parent.value();
+  return createComputeRef(vm.env, () => {
+    let state = stateFor(outletRef);
 
-    if (state === undefined) {
-      return undefined;
+    if (!validate(state, lastState)) {
+      lastState = state;
+
+      if (state !== null) {
+        definition = curry(new OutletComponentDefinition(state), {
+          named: {
+            model: childRefFromParts(outletRef, ['render', 'model']),
+          },
+          positional: EMPTY_POSITIONAL_ARGS,
+        });
+      } else {
+        definition = null;
+      }
     }
 
-    let { render } = state;
-
-    if (render === undefined) {
-      return undefined;
-    }
-
-    return render.model as unknown;
-  }
+    return definition;
+  });
 }
 
-if (DEBUG) {
-  OutletModelReference.prototype['debugLogName'] = '@model';
-}
+// if (DEBUG) {
+//   OutletModelReference.prototype['debugLogName'] = '@model';
+// }
 
-class OutletComponentReference implements PathReference<CurriedComponentDefinition | null> {
-  private definition: Option<CurriedComponentDefinition> = null;
-  private lastState: Option<OutletDefinitionState> = null;
-
-  constructor(
-    private outletRef: PathReference<OutletState | undefined>,
-    private env: EmberVMEnvironment
-  ) {}
-
-  value(): CurriedComponentDefinition | null {
-    let state = stateFor(this.outletRef);
-    if (validate(state, this.lastState)) {
-      return this.definition;
-    }
-    this.lastState = state;
-
-    let definition = null;
-
-    if (state !== null) {
-      let args = EMBER_ROUTING_MODEL_ARG ? makeArgs(this.outletRef, this.env) : null;
-
-      definition = curry(new OutletComponentDefinition(state), args);
-    }
-
-    return (this.definition = definition);
-  }
-
-  get(_key: string) {
-    return UNDEFINED_REFERENCE;
-  }
-}
-
-function makeArgs(
-  outletRef: PathReference<OutletState | undefined>,
-  env: EmberVMEnvironment
-): CapturedArguments {
-  let modelRef = new OutletModelReference(outletRef, env);
-  let map = dict<PathReference>();
-  map.model = modelRef;
-
-  // TODO: the functionailty to create a proper CapturedArgument should be
-  // exported by glimmer, or that it should provide an overload for `curry`
-  // that takes `PreparedArguments`
-  return {
-    positional: EMPTY_ARGS.positional,
-    named: {
-      map,
-      names: ['model'],
-      references: [modelRef],
-      length: 1,
-      has(key: string): boolean {
-        return key === 'model';
-      },
-      get<T extends PathReference>(key: string): T {
-        return (key === 'model' ? modelRef : UNDEFINED_REFERENCE) as unsafe;
-      },
-      value(): Dict<unknown> {
-        let model = modelRef.value();
-        return { model };
-      },
-    },
-    length: 1,
-    value() {
-      return {
-        named: this.named.value(),
-        positional: this.positional.value(),
-      };
-    },
-  };
-}
-
-function stateFor(ref: PathReference<OutletState | undefined>): OutletDefinitionState | null {
-  let outlet = ref.value();
+function stateFor(ref: Reference<OutletState | undefined>): OutletDefinitionState | null {
+  let outlet = valueForRef(ref);
   if (outlet === undefined) return null;
   let render = outlet.render;
   if (render === undefined) return null;

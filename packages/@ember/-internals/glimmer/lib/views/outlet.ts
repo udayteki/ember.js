@@ -1,11 +1,12 @@
 import { OWNER, Owner } from '@ember/-internals/owner';
 import { assign } from '@ember/polyfills';
 import { schedule } from '@ember/runloop';
+import { childRefFromParts, createRootRef, Reference, updateRef } from '@glimmer/reference';
 import { SimpleElement } from '@simple-dom/interface';
 import { OutletDefinitionState } from '../component-managers/outlet';
 import { Renderer } from '../renderer';
 import { OwnedTemplate } from '../template';
-import { OutletState, RootOutletReference } from '../utils/outlet';
+import { OutletState } from '../utils/outlet';
 
 export interface BootEnvironment {
   hasDOM: boolean;
@@ -40,7 +41,7 @@ export default class OutletView {
     return new OutletView(_environment, renderer, owner, template);
   }
 
-  public ref: RootOutletReference;
+  private mainRef: Reference;
   public state: OutletDefinitionState;
 
   constructor(
@@ -49,18 +50,25 @@ export default class OutletView {
     public owner: Owner,
     public template: OwnedTemplate
   ) {
-    let ref = (this.ref = new RootOutletReference({
-      outlets: { main: undefined },
-      render: {
-        owner: owner,
-        into: undefined,
-        outlet: TOP_LEVEL_OUTLET,
-        name: TOP_LEVEL_NAME,
-        controller: undefined,
-        model: undefined,
-        template,
-      },
-    }));
+    let ref = createRootRef(
+      // TODO: Fix this! Private access === bad
+      renderer['_runtime'].env,
+      {
+        outlets: { main: undefined },
+        render: {
+          owner: owner,
+          into: undefined,
+          outlet: TOP_LEVEL_OUTLET,
+          name: TOP_LEVEL_NAME,
+          controller: undefined,
+          model: undefined,
+          template,
+        },
+      }
+    );
+
+    this.mainRef = childRefFromParts(ref, ['outlets', 'main']);
+
     this.state = {
       ref,
       name: TOP_LEVEL_NAME,
@@ -88,7 +96,7 @@ export default class OutletView {
   }
 
   setOutletState(state: OutletState) {
-    this.ref.update(state);
+    updateRef(this.mainRef, state);
   }
 
   destroy() {

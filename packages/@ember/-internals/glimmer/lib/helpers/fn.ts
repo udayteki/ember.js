@@ -1,9 +1,9 @@
 import { assert } from '@ember/debug';
 import { DEBUG } from '@glimmer/env';
-import { CapturedArguments, Environment, VM, VMArguments } from '@glimmer/interfaces';
-import { HelperRootReference } from '@glimmer/reference';
+import { VM, VMArguments } from '@glimmer/interfaces';
+import { createComputeRef, isInvokableRef, updateRef, valueForRef } from '@glimmer/reference';
+import { reifyPositional } from '@glimmer/runtime';
 import buildUntouchableThis from '../utils/untouchable-this';
-import { INVOKE } from './mut';
 
 const context = buildUntouchableThis('`fn` helper');
 
@@ -79,45 +79,39 @@ const context = buildUntouchableThis('`fn` helper');
   @since 3.11.0
 */
 
-function fn({ positional }: CapturedArguments, env?: Environment<unknown>) {
-  let callbackRef = positional.at(0);
+export default function(args: VMArguments, vm: VM) {
+  let positional = args.positional.capture();
 
-  assert(
-    `You must pass a function as the \`fn\` helpers first argument.`,
-    callbackRef !== undefined
-  );
-
-  if (DEBUG && typeof callbackRef[INVOKE] !== 'function') {
-    let callback = callbackRef.value();
+  return createComputeRef(vm.env, () => {
+    let callbackRef = positional[0];
 
     assert(
-      `You must pass a function as the \`fn\` helpers first argument, you passed ${
-        callback === null ? 'null' : typeof callback
-      }. ${env!.getTemplatePathDebugContext(callbackRef)}`,
-      typeof callback === 'function'
+      `You must pass a function as the \`fn\` helpers first argument.`,
+      callbackRef !== undefined
     );
-  }
 
-  return (...invocationArgs: unknown[]) => {
-    let [fn, ...args] = positional.value();
+    if (DEBUG && !isInvokableRef(callbackRef)) {
+      let callback = valueForRef(callbackRef);
 
-    if (typeof callbackRef[INVOKE] === 'function') {
-      // references with the INVOKE symbol expect the function behind
-      // the symbol to be bound to the reference
-      return callbackRef[INVOKE](...args, ...invocationArgs);
-    } else {
-      return (fn as Function).call(context, ...args, ...invocationArgs);
+      assert(
+        `You must pass a function as the \`fn\` helpers first argument, you passed ${
+          callback === null ? 'null' : typeof callback
+        }. ${vm.env!.getTemplatePathDebugContext(callbackRef)}`,
+        typeof callback === 'function'
+      );
     }
-  };
-}
 
-export default function(args: VMArguments, vm: VM) {
-  let callback = fn;
-  if (DEBUG) {
-    callback = (args: CapturedArguments) => {
-      return fn(args, vm.env);
+    return (...invocationArgs: unknown[]) => {
+      let [fn, ...args] = reifyPositional(positional);
+
+      if (isInvokableRef(callbackRef)) {
+        // references with the INVOKE symbol expect the function behind
+        // the symbol to be bound to the reference
+        let value = args[0] || invocationArgs[0];
+        return updateRef(callbackRef, value);
+      } else {
+        return (fn as Function).call(context, ...args, ...invocationArgs);
+      }
     };
-  }
-
-  return new HelperRootReference(callback, args.capture(), vm.env);
+  });
 }

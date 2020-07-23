@@ -1,10 +1,12 @@
-import { get as emberGet, set as emberSet } from '@ember/-internals/metal';
-import { isObject } from '@ember/-internals/utils';
-import { CapturedArguments, Environment, VM, VMArguments } from '@glimmer/interfaces';
-import { HelperRootReference, PathReference, UPDATE_REFERENCED_VALUE } from '@glimmer/reference';
-import { NULL_REFERENCE } from '@glimmer/runtime';
-import { isConstMemo } from '@glimmer/validator';
-import { referenceFromParts } from '../utils/references';
+import { VMArguments } from '@glimmer/interfaces';
+import {
+  childRefFor,
+  childRefFromParts,
+  createPrimitiveRef,
+  isConstRef,
+  valueForRef,
+} from '@glimmer/reference';
+import { NULL_REFERENCE } from '@glimmer/reference';
 
 /**
 @module ember
@@ -90,56 +92,24 @@ import { referenceFromParts } from '../utils/references';
   @for Ember.Templates.helpers
   @since 2.1.0
  */
-export default function(args: VMArguments, vm: VM) {
+export default function(args: VMArguments) {
   let sourceReference = args.positional.at(0);
   let pathReference = args.positional.at(1);
 
-  let path = pathReference.value();
-
-  if (isConstMemo(pathReference.value)) {
+  if (isConstRef(pathReference)) {
     // Since the path is constant, we can create a normal chain of property
     // references. The source reference will update like normal, and all of the
     // child references will update accordingly.
+    let path = valueForRef(pathReference);
 
     if (path === undefined || path === null || path === '') {
       return NULL_REFERENCE;
     } else if (typeof path === 'string' && path.indexOf('.') > -1) {
-      return referenceFromParts(sourceReference, path.split('.'));
+      return childRefFromParts(sourceReference, path.split('.'));
     } else {
-      return sourceReference.get(String(path));
+      return childRefFor(sourceReference, String(path));
     }
   } else {
-    return new GetHelperRootReference(args.capture(), vm.env);
-  }
-}
-
-function get({ positional }: CapturedArguments) {
-  let source = positional.at(0).value();
-
-  if (isObject(source)) {
-    let path = positional.at(1).value();
-
-    return emberGet(source, String(path));
-  }
-}
-
-class GetHelperRootReference extends HelperRootReference {
-  private sourceReference: PathReference<object>;
-  private pathReference: PathReference<string>;
-
-  constructor(args: CapturedArguments, env: Environment) {
-    super(get, args, env);
-    this.sourceReference = args.positional.at(0);
-    this.pathReference = args.positional.at(1);
-  }
-
-  [UPDATE_REFERENCED_VALUE](value: any) {
-    let source = this.sourceReference.value();
-
-    if (isObject(source)) {
-      let path = String(this.pathReference.value());
-
-      emberSet(source, path, value);
-    }
+    return childRefFor(sourceReference, pathReference);
   }
 }

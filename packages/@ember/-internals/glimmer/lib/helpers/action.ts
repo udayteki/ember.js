@@ -8,11 +8,16 @@ import { flaggedInstrument } from '@ember/instrumentation';
 import { join } from '@ember/runloop';
 import { DEBUG } from '@glimmer/env';
 import { VM, VMArguments } from '@glimmer/interfaces';
-import { PathReference } from '@glimmer/reference';
-import { UnboundRootReference } from '../utils/references';
-import { INVOKE } from './mut';
+import {
+  createRootRef,
+  isInvokableRef,
+  Reference,
+  updateRef,
+  valueForRef,
+} from '@glimmer/reference';
+import { _WeakSet } from '@ember/polyfills';
 
-export const ACTION = symbol('ACTION');
+export const ACTIONS = new _WeakSet();
 
 /**
   The `{{action}}` helper provides a way to pass triggers for behavior (usually
@@ -277,7 +282,7 @@ export const ACTION = symbol('ACTION');
   @for Ember.Templates.helpers
   @public
 */
-export default function(args: VMArguments, vm: VM): UnboundRootReference<Function> {
+export default function(args: VMArguments, vm: VM): Reference<Function> {
   let { named, positional } = args;
 
   let capturedArgs = positional.capture();
@@ -286,7 +291,7 @@ export default function(args: VMArguments, vm: VM): UnboundRootReference<Functio
   // pos[0] is the context (or `this`)
   // pos[1] is the action name or function
   // Anything else is an action argument.
-  let [context, action, ...restArgs] = capturedArgs.references;
+  let [context, action, ...restArgs] = capturedArgs;
 
   // TODO: Is there a better way of doing this?
   let debugKey: string | undefined = (action as any).propertyKey;
@@ -296,32 +301,29 @@ export default function(args: VMArguments, vm: VM): UnboundRootReference<Functio
 
   let fn: Function;
 
-  if (typeof action[INVOKE] === 'function') {
-    fn = makeClosureAction(action, action, action[INVOKE], processArgs, debugKey);
+  if (isInvokableRef(action)) {
+    fn = makeClosureAction(action, action, invokeRef, processArgs, debugKey);
     // } else if (isConstTagged(target) && isConstTagged(action)) {
     //   fn = makeClosureAction(context.value(), target.value(), action.value(), processArgs, debugKey);
   } else {
-    fn = makeDynamicClosureAction(context.value(), target, action, processArgs, debugKey);
+    fn = makeDynamicClosureAction(valueForRef(context), target, action, processArgs, debugKey);
   }
 
-  fn[ACTION] = true;
+  ACTIONS.add(fn);
 
-  return new UnboundRootReference(fn, vm.env);
+  return createRootRef(vm.env, fn, true, true);
 }
 
 function NOOP(args: VMArguments) {
   return args;
 }
 
-function makeArgsProcessor(
-  valuePathRef: PathReference<unknown> | false,
-  actionArgsRef: Array<PathReference<unknown>>
-) {
+function makeArgsProcessor(valuePathRef: Reference | false, actionArgsRef: Reference[]) {
   let mergeArgs: any;
 
   if (actionArgsRef.length > 0) {
     mergeArgs = (args: VMArguments) => {
-      return actionArgsRef.map(ref => ref.value()).concat(args);
+      return actionArgsRef.map(valueForRef).concat(args);
     };
   }
 
@@ -329,7 +331,7 @@ function makeArgsProcessor(
 
   if (valuePathRef) {
     readValue = (args: any) => {
-      let valuePath = valuePathRef.value();
+      let valuePath = valueForRef(valuePathRef);
 
       if (valuePath && args.length > 0) {
         args[0] = get(args[0], valuePath as string);
@@ -357,13 +359,23 @@ function makeDynamicClosureAction(
 ) {
   // We don't allow undefined/null values, so this creates a throw-away action to trigger the assertions
   if (DEBUG) {
-    makeClosureAction(context, targetRef.value(), actionRef.value(), processArgs, debugKey);
+    makeClosureAction(
+      context,
+      valueForRef(targetRef),
+      valueForRef(actionRef),
+      processArgs,
+      debugKey
+    );
   }
 
   return (...args: any[]) => {
-    return makeClosureAction(context, targetRef.value(), actionRef.value(), processArgs, debugKey)(
-      ...args
-    );
+    return makeClosureAction(
+      context,
+      valueForRef(targetRef),
+      valueForRef(actionRef),
+      processArgs,
+      debugKey
+    )(...args);
   };
 }
 
@@ -382,9 +394,9 @@ function makeClosureAction(
     action !== undefined && action !== null
   );
 
-  if (typeof action[INVOKE] === 'function') {
+  if (isInvokableRef(action)) {
     self = action;
-    fn = action[INVOKE];
+    fn = invokeRef;
   } else {
     let typeofAction = typeof action;
 
@@ -413,4 +425,10 @@ function makeClosureAction(
       return join(self, fn, ...processArgs(args));
     });
   };
+}
+
+// TODO: HAX this is cause the above code assumes that ref will be an object with
+// methods, which is not true after the recent refactors
+function invokeRef(this: Reference, value: unknown) {
+  updateRef(this, value);
 }

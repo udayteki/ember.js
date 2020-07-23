@@ -1,7 +1,7 @@
 import { Factory } from '@ember/-internals/owner';
 import { assert } from '@ember/debug';
 import { CapturedArguments, Dict, ModifierManager, VMArguments } from '@glimmer/interfaces';
-import { registerDestructor } from '@glimmer/runtime';
+import { registerDestructor, reifyArgs } from '@glimmer/runtime';
 import { createUpdatableTag, untrack } from '@glimmer/validator';
 import { SimpleElement } from '@simple-dom/interface';
 
@@ -61,7 +61,7 @@ export class CustomModifierState<ModifierInstance> {
     public modifier: ModifierInstance,
     public args: CapturedArguments
   ) {
-    registerDestructor(this, () => delegate.destroyModifier(modifier, args.value()));
+    registerDestructor(this, () => delegate.destroyModifier(modifier, reifyArgs(args)));
   }
 }
 
@@ -77,11 +77,6 @@ export interface ModifierManagerDelegate<ModifierInstance> {
   installModifier(instance: ModifierInstance, element: SimpleElement, args: Args): void;
   updateModifier(instance: ModifierInstance, args: Args): void;
   destroyModifier(instance: ModifierInstance, args: Args): void;
-}
-
-function trackArgs(args: CapturedArguments) {
-  args.named.references.forEach(n => n.value());
-  args.positional.references.forEach(n => n.value());
 }
 
 /**
@@ -122,7 +117,7 @@ class InteractiveCustomModifierManager<ModifierInstance>
     let { delegate, ModifierClass } = definition;
     const capturedArgs = args.capture();
 
-    let instance = definition.delegate.createModifier(ModifierClass, capturedArgs.value());
+    let instance = definition.delegate.createModifier(ModifierClass, reifyArgs(capturedArgs));
     return new CustomModifierState(element, delegate, instance, capturedArgs);
   }
 
@@ -139,26 +134,24 @@ class InteractiveCustomModifierManager<ModifierInstance>
     );
 
     let { capabilities } = delegate;
-
-    trackArgs(args);
+    let reified = reifyArgs(args);
 
     if (capabilities.disableAutoTracking === true) {
-      untrack(() => delegate.installModifier(modifier, element, args.value()));
+      untrack(() => delegate.installModifier(modifier, element, reified));
     } else {
-      delegate.installModifier(modifier, element, args.value());
+      delegate.installModifier(modifier, element, reified);
     }
   }
 
   update(state: CustomModifierState<ModifierInstance>) {
     let { args, delegate, modifier } = state;
     let { capabilities } = delegate;
-
-    trackArgs(args);
+    let reified = reifyArgs(args);
 
     if (capabilities.disableAutoTracking === true) {
-      untrack(() => delegate.updateModifier(modifier, args.value()));
+      untrack(() => delegate.updateModifier(modifier, reified));
     } else {
-      delegate.updateModifier(modifier, args.value());
+      delegate.updateModifier(modifier, reified);
     }
   }
 

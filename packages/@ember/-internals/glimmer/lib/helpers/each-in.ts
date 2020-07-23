@@ -4,8 +4,8 @@
 import { tagForObject } from '@ember/-internals/metal';
 import { _contentFor } from '@ember/-internals/runtime';
 import { isProxy } from '@ember/-internals/utils';
-import { VMArguments } from '@glimmer/interfaces';
-import { PathReference } from '@glimmer/reference';
+import { VM, VMArguments } from '@glimmer/interfaces';
+import { createComputeRef, valueForRef } from '@glimmer/reference';
 import { consumeTag } from '@glimmer/validator';
 
 /**
@@ -154,11 +154,15 @@ import { consumeTag } from '@glimmer/validator';
   @public
   @since 2.1.0
 */
-class EachInReference implements PathReference {
-  constructor(private inner: PathReference) {}
+export class EachInWrapper {
+  constructor(public inner: unknown) {}
+}
 
-  value(): unknown {
-    let iterable = this.inner.value();
+export default function(args: VMArguments, vm: VM) {
+  let inner = args.positional.at(0);
+
+  return createComputeRef(vm.env, () => {
+    let iterable = valueForRef(inner);
 
     consumeTag(tagForObject(iterable));
 
@@ -169,17 +173,5 @@ class EachInReference implements PathReference {
     }
 
     return new EachInWrapper(iterable);
-  }
-
-  get(key: string): PathReference {
-    return this.inner.get(key);
-  }
-}
-
-export class EachInWrapper {
-  constructor(public inner: unknown) {}
-}
-
-export default function(args: VMArguments) {
-  return new EachInReference(args.positional.at(0));
+  });
 }

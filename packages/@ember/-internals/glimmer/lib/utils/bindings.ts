@@ -2,21 +2,21 @@ import { get } from '@ember/-internals/metal';
 import { assert, deprecate } from '@ember/debug';
 import { EMBER_COMPONENT_IS_VISIBLE } from '@ember/deprecated-features';
 import { dasherize } from '@ember/string';
-import { DEBUG } from '@glimmer/env';
-import { ElementOperations, Option } from '@glimmer/interfaces';
-import { PathReference, Reference, RootReference } from '@glimmer/reference';
-import { PrimitiveReference, UNDEFINED_REFERENCE } from '@glimmer/runtime';
-import { SimpleElement } from '@simple-dom/interface';
+import { ElementOperations, Environment } from '@glimmer/interfaces';
+import {
+  childRefFor,
+  childRefFromParts,
+  createComputeRef,
+  createPrimitiveRef,
+  Reference,
+  UNDEFINED_REFERENCE,
+  valueForRef,
+} from '@glimmer/reference';
 import { EmberVMEnvironment } from '../environment';
 import { Component } from './curly-component-state-bucket';
-import { referenceFromParts } from './references';
 import { htmlSafe, isHTMLSafe, SafeString } from './string';
 
-export function referenceForKey(rootRef: RootReference<Component>, key: string) {
-  return rootRef.get(key);
-}
-
-function referenceForParts(rootRef: RootReference<Component>, parts: string[]): Reference {
+function referenceForParts(rootRef: Reference<Component>, parts: string[]): Reference {
   let isAttrs = parts[0] === 'attrs';
 
   // TODO deprecate this
@@ -24,136 +24,113 @@ function referenceForParts(rootRef: RootReference<Component>, parts: string[]): 
     parts.shift();
 
     if (parts.length === 1) {
-      return referenceForKey(rootRef, parts[0]);
+      return childRefFor(rootRef, parts[0]);
     }
   }
 
-  return referenceFromParts(rootRef, parts);
+  return childRefFromParts(rootRef, parts);
 }
 
-export const AttributeBinding = {
-  parse(microsyntax: string): [string, string, boolean] {
-    let colonIndex = microsyntax.indexOf(':');
+export function parseAttributeBinding(microsyntax: string): [string, string, boolean] {
+  let colonIndex = microsyntax.indexOf(':');
 
-    if (colonIndex === -1) {
-      assert(
-        'You cannot use class as an attributeBinding, use classNameBindings instead.',
-        microsyntax !== 'class'
-      );
-      return [microsyntax, microsyntax, true];
-    } else {
-      let prop = microsyntax.substring(0, colonIndex);
-      let attribute = microsyntax.substring(colonIndex + 1);
-
-      assert(
-        'You cannot use class as an attributeBinding, use classNameBindings instead.',
-        attribute !== 'class'
-      );
-
-      return [prop, attribute, false];
-    }
-  },
-
-  install(
-    component: Component,
-    rootRef: RootReference<Component>,
-    parsed: [string, string, boolean],
-    operations: ElementOperations,
-    env: EmberVMEnvironment
-  ) {
-    let [prop, attribute, isSimple] = parsed;
-
-    if (attribute === 'id') {
-      let elementId = get(component, prop);
-      if (elementId === undefined || elementId === null) {
-        elementId = component.elementId;
-      }
-      elementId = PrimitiveReference.create(elementId);
-      operations.setAttribute('id', elementId, true, null);
-      // operations.addStaticAttribute(element, 'id', elementId);
-      return;
-    }
-
-    let isPath = prop.indexOf('.') > -1;
-    let reference = isPath
-      ? referenceForParts(rootRef, prop.split('.'))
-      : referenceForKey(rootRef, prop);
+  if (colonIndex === -1) {
+    assert(
+      'You cannot use class as an attributeBinding, use classNameBindings instead.',
+      microsyntax !== 'class'
+    );
+    return [microsyntax, microsyntax, true];
+  } else {
+    let prop = microsyntax.substring(0, colonIndex);
+    let attribute = microsyntax.substring(colonIndex + 1);
 
     assert(
-      `Illegal attributeBinding: '${prop}' is not a valid attribute name.`,
-      !(isSimple && isPath)
+      'You cannot use class as an attributeBinding, use classNameBindings instead.',
+      attribute !== 'class'
     );
 
-    if (
-      EMBER_COMPONENT_IS_VISIBLE &&
-      attribute === 'style' &&
-      StyleBindingReference !== undefined
-    ) {
-      reference = new StyleBindingReference(
-        rootRef,
-        reference,
-        referenceForKey(rootRef, 'isVisible'),
-        env
-      );
-    }
+    return [prop, attribute, false];
+  }
+}
 
-    operations.setAttribute(attribute, reference, false, null);
-    // operations.addDynamicAttribute(element, attribute, reference, false);
-  },
-};
+export function installAttributeBinding(
+  env: EmberVMEnvironment,
+  component: Component,
+  rootRef: Reference<Component>,
+  parsed: [string, string, boolean],
+  operations: ElementOperations
+) {
+  let [prop, attribute, isSimple] = parsed;
+
+  if (attribute === 'id') {
+    let elementId = get(component, prop);
+    if (elementId === undefined || elementId === null) {
+      elementId = component.elementId;
+    }
+    elementId = createPrimitiveRef(elementId);
+    operations.setAttribute('id', elementId, true, null);
+    return;
+  }
+
+  let isPath = prop.indexOf('.') > -1;
+  let reference = isPath ? referenceForParts(rootRef, prop.split('.')) : childRefFor(rootRef, prop);
+
+  assert(
+    `Illegal attributeBinding: '${prop}' is not a valid attribute name.`,
+    !(isSimple && isPath)
+  );
+
+  if (EMBER_COMPONENT_IS_VISIBLE && attribute === 'style' && createStyleBindingRef !== undefined) {
+    reference = createStyleBindingRef(env, rootRef, reference, childRefFor(rootRef, 'isVisible'));
+  }
+
+  operations.setAttribute(attribute, reference, false, null);
+}
 
 const DISPLAY_NONE = 'display: none;';
 const SAFE_DISPLAY_NONE = htmlSafe(DISPLAY_NONE);
 
-let StyleBindingReference:
+let createStyleBindingRef:
   | undefined
-  | {
-      new (
-        parent: PathReference<Component>,
-        inner: Reference<unknown>,
-        isVisible: Reference<unknown>,
-        env: EmberVMEnvironment
-      ): Reference<string | SafeString>;
-    };
+  | ((
+      env: Environment,
+      parent: Reference<Component>,
+      inner: Reference,
+      isVisible: Reference
+    ) => Reference<string | SafeString>);
 
 export let installIsVisibleBinding:
   | undefined
   | ((
-      rootRef: RootReference<Component>,
-      operations: ElementOperations,
-      environment: EmberVMEnvironment
+      environment: Environment,
+      rootRef: Reference<Component>,
+      operations: ElementOperations
     ) => void);
 
 if (EMBER_COMPONENT_IS_VISIBLE) {
-  StyleBindingReference = class implements PathReference<string | SafeString> {
-    constructor(
-      parent: PathReference<Component>,
-      private inner: Reference<unknown>,
-      private isVisible: Reference<unknown>,
-      private env: EmberVMEnvironment
-    ) {
-      if (DEBUG) {
-        env.setTemplatePathDebugContext(this, 'style', parent);
-      }
-    }
+  createStyleBindingRef = (
+    env: Environment,
+    parent: Reference<Component>,
+    inner: Reference,
+    isVisibleRef: Reference
+  ) => {
+    return createComputeRef(env, () => {
+      let value = valueForRef(inner);
+      let isVisible = valueForRef(isVisibleRef);
 
-    value(): string | SafeString {
-      let value = this.inner.value();
-      let isVisible = this.isVisible.value();
-
-      if (isVisible !== undefined) {
-        deprecate(
-          `The \`isVisible\` property on classic component classes is deprecated. Was accessed ${this.env
-            .getTemplatePathDebugContext(this)
-            .replace(/^W/, 'w')}`,
-          false,
-          {
-            id: 'ember-component.is-visible',
-            until: '4.0.0',
-            url: 'https://deprecations.emberjs.com/v3.x#toc_ember-component-is-visible',
-          }
-        );
-      }
+      // if (isVisible !== undefined) {
+      //   deprecate(
+      //     `The \`isVisible\` property on classic component classes is deprecated. Was accessed ${env
+      //       .getTemplatePathDebugContext(this)
+      //       .replace(/^W/, 'w')}`,
+      //     false,
+      //     {
+      //       id: 'ember-component.is-visible',
+      //       until: '4.0.0',
+      //       url: 'https://deprecations.emberjs.com/v3.x#toc_ember-component-is-visible',
+      //     }
+      //   );
+      // }
 
       if (isVisible !== false) {
         return value as string;
@@ -163,25 +140,21 @@ if (EMBER_COMPONENT_IS_VISIBLE) {
         let style = value + ' ' + DISPLAY_NONE;
         return isHTMLSafe(value) ? htmlSafe(style) : style;
       }
-    }
-
-    get() {
-      return UNDEFINED_REFERENCE;
-    }
+    });
   };
 
   installIsVisibleBinding = (
-    rootRef: RootReference<Component>,
-    operations: ElementOperations,
-    environment: EmberVMEnvironment
+    environment: Environment,
+    rootRef: Reference<Component>,
+    operations: ElementOperations
   ) => {
     operations.setAttribute(
       'style',
-      new StyleBindingReference!(
+      createStyleBindingRef!(
+        environment,
         rootRef,
         UNDEFINED_REFERENCE,
-        rootRef.get('isVisible'),
-        environment
+        childRefFor(rootRef, 'isVisible')
       ),
       false,
       null
@@ -189,63 +162,56 @@ if (EMBER_COMPONENT_IS_VISIBLE) {
   };
 }
 
-export const ClassNameBinding = {
-  install(
-    _element: SimpleElement,
-    rootRef: RootReference<Component>,
-    microsyntax: string,
-    operations: ElementOperations
-  ) {
-    let [prop, truthy, falsy] = microsyntax.split(':');
-    let isStatic = prop === '';
+export function createClassNameBindingRef(
+  env: Environment,
+  rootRef: Reference<Component>,
+  microsyntax: string,
+  operations: ElementOperations
+) {
+  let [prop, truthy, falsy] = microsyntax.split(':');
+  let isStatic = prop === '';
 
-    if (isStatic) {
-      operations.setAttribute('class', PrimitiveReference.create(truthy), true, null);
+  if (isStatic) {
+    operations.setAttribute('class', createPrimitiveRef(truthy), true, null);
+  } else {
+    let isPath = prop.indexOf('.') > -1;
+    let parts = isPath ? prop.split('.') : [];
+    let value = isPath ? referenceForParts(rootRef, parts) : childRefFor(rootRef, prop);
+    let ref;
+
+    if (truthy === undefined) {
+      ref = createSimpleClassNameBindingRef(env, value, isPath ? parts[parts.length - 1] : prop);
     } else {
-      let isPath = prop.indexOf('.') > -1;
-      let parts = isPath ? prop.split('.') : [];
-      let value = isPath ? referenceForParts(rootRef, parts) : referenceForKey(rootRef, prop);
-      let ref;
-
-      if (truthy === undefined) {
-        ref = new SimpleClassNameBindingReference(value, isPath ? parts[parts.length - 1] : prop);
-      } else {
-        ref = new ColonClassNameBindingReference(value, truthy, falsy);
-      }
-
-      operations.setAttribute('class', ref, false, null);
+      ref = createColonClassNameBindingRef(env, value, truthy, falsy);
     }
-  },
-};
 
-export class SimpleClassNameBindingReference implements Reference<Option<string>> {
-  private dasherizedPath: Option<string> = null;
+    operations.setAttribute('class', ref, false, null);
+  }
+}
 
-  constructor(private inner: Reference<unknown | number>, private path: string) {}
+export function createSimpleClassNameBindingRef(env: Environment, inner: Reference, path: string) {
+  let dasherizedPath: string;
 
-  value(): Option<string> {
-    let value = this.inner.value();
+  return createComputeRef(env, () => {
+    let value = valueForRef(inner);
 
     if (value === true) {
-      let { path, dasherizedPath } = this;
-      return dasherizedPath || (this.dasherizedPath = dasherize(path));
+      return dasherizedPath || (dasherizedPath = dasherize(path));
     } else if (value || value === 0) {
       return String(value);
     } else {
       return null;
     }
-  }
+  });
 }
 
-class ColonClassNameBindingReference implements Reference<Option<string>> {
-  constructor(
-    private inner: Reference<unknown>,
-    private truthy: Option<string> = null,
-    private falsy: Option<string> = null
-  ) {}
-
-  value(): Option<string> {
-    let { inner, truthy, falsy } = this;
-    return inner.value() ? truthy : falsy;
-  }
+export function createColonClassNameBindingRef(
+  env: Environment,
+  inner: Reference,
+  truthy: string,
+  falsy: string
+) {
+  return createComputeRef(env, () => {
+    return valueForRef(inner) ? truthy : falsy;
+  });
 }

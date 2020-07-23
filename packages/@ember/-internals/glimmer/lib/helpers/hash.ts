@@ -1,5 +1,6 @@
-import { Dict, VMArguments } from '@glimmer/interfaces';
-import { PathReference } from '@glimmer/reference';
+import { Dict, VM, VMArguments } from '@glimmer/interfaces';
+import { createComputeRef, Reference } from '@glimmer/reference';
+import { reifyNamed } from '@glimmer/runtime';
 
 /**
 @module ember
@@ -43,7 +44,8 @@ import { PathReference } from '@glimmer/reference';
    @since 2.3.0
    @public
  */
+export default function(args: VMArguments, vm: VM): Reference<Dict<unknown>> {
+  let positional = args.named.capture();
 
-export default function(args: VMArguments): PathReference<Dict<unknown>> {
-  return args.named.capture();
+  return createComputeRef(vm.env, () => reifyNamed(positional));
 }

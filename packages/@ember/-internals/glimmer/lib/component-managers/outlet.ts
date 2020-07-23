@@ -15,7 +15,7 @@ import {
   WithDynamicTagName,
   WithJitStaticLayout,
 } from '@glimmer/interfaces';
-import { ComponentRootReference, PathReference } from '@glimmer/reference';
+import { createRootRef, Reference, valueForRef } from '@glimmer/reference';
 import { EMPTY_ARGS, registerDestructor } from '@glimmer/runtime';
 import { unwrapTemplate } from '@glimmer/util';
 import { CONSTANT_TAG, createTag, Tag } from '@glimmer/validator';
@@ -34,7 +34,7 @@ function instrumentationPayload(def: OutletDefinitionState) {
 }
 
 interface OutletInstanceState {
-  self: PathReference<any | undefined>;
+  self: Reference;
   environment: EmberVMEnvironment;
   outlet?: { name: string };
   engine?: { mountPoint: string };
@@ -42,7 +42,7 @@ interface OutletInstanceState {
 }
 
 export interface OutletDefinitionState {
-  ref: PathReference<OutletState | undefined>;
+  ref: Reference<OutletState | undefined>;
   name: string;
   outlet: string;
   template: OwnedTemplate;
@@ -79,7 +79,7 @@ class OutletComponentManager extends AbstractManager<OutletInstanceState, Outlet
     dynamicScope.outletState = currentStateRef;
 
     let state: OutletInstanceState = {
-      self: new ComponentRootReference(definition.controller, environment),
+      self: createRootRef(environment, definition.controller),
       environment,
       finalize: _instrumentStart('render.outlet', instrumentationPayload, definition),
     };
@@ -95,9 +95,9 @@ class OutletComponentManager extends AbstractManager<OutletInstanceState, Outlet
         template: undefined,
       });
 
-      let parentState = parentStateRef.value();
+      let parentState = valueForRef(parentStateRef);
       let parentOwner = parentState && parentState.render && parentState.render.owner;
-      let currentOwner = currentStateRef.value()!.render!.owner;
+      let currentOwner = valueForRef(currentStateRef)!.render!.owner;
 
       if (parentOwner && parentOwner !== currentOwner) {
         let engine = currentOwner as EngineInstance;

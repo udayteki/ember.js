@@ -2,8 +2,8 @@
 @module ember
 */
 import { tagForProperty } from '@ember/-internals/metal';
-import { VMArguments } from '@glimmer/interfaces';
-import { PathReference } from '@glimmer/reference';
+import { VM, VMArguments } from '@glimmer/interfaces';
+import { createComputeRef, valueForRef } from '@glimmer/reference';
 import { consumeTag } from '@glimmer/validator';
 
 /**
@@ -11,22 +11,14 @@ import { consumeTag } from '@glimmer/validator';
   updates to `{{each}}` when it changes. It is put into place by a template
   transform at build time, similar to the (-each-in) helper
 */
-class TrackArrayReference implements PathReference {
-  constructor(private inner: PathReference) {}
+export default function trackArray(args: VMArguments, vm: VM) {
+  let inner = args.positional.at(0);
 
-  value(): unknown {
-    let iterable = this.inner.value();
+  return createComputeRef(vm.env, () => {
+    let iterable = valueForRef(inner);
 
     consumeTag(tagForProperty(iterable, '[]'));
 
     return iterable;
-  }
-
-  get(key: string): PathReference {
-    return this.inner.get(key);
-  }
-}
-
-export default function trackArray(args: VMArguments) {
-  return new TrackArrayReference(args.positional.at(0));
+  });
 }
